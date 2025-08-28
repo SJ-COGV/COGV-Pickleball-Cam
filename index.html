@@ -29,9 +29,9 @@
   <script>
     // ===== settings (match these to your Beelink timer) =====
     const PUBLISH_INTERVAL_MS = 120000;   // 2 minutes
-    const IMAGE_REFRESH_MS    = 30000;    // reload <img> to defeat cache
-    const PIPELINE_OFFSET_MS  = 13000;    // ~13s delay for publish→GitHub availability
-    const META_POLL_MS        = 7000;     // poll meta.json for new timestamps
+    const IMAGE_REFRESH_MS    = 10000;    // reload <img> to defeat cache
+    const PIPELINE_OFFSET_MS  = 5000;    // 5s delay for publish→GitHub availability
+    const META_POLL_MS        = 3000;     // poll meta.json for new timestamps
 
     // Data repo raw URLs (change 'main' to 'master' if your data repo uses master)
     const SNAP_URL = 'https://raw.githubusercontent.com/SJ-COGV/COGV-Pickleball-Cam-Data/main/snapshot.jpg';
