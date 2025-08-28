@@ -1,12 +1,12 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Pickleball Court Snapshot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: dark; }
-    body{background:#222;color:#fff;font-family:system-ui,Arial;margin:0;text-align:center}
+    body{background:#111;color:#fff;font-family:system-ui,Arial;margin:0;text-align:center}
     header{padding:16px 12px 0}
     .meta{color:#bbb;font-size:14px;margin:6px 0 18px}
     img{width:90%;max-width:1400px;height:auto;border:4px solid #444;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.35)}
@@ -21,33 +21,34 @@
       <div class="pill">Next refresh in: <span id="count">--:--</span></div>
     </div>
     <div class="meta">Image updates every ~2 minutes. Page holds at 00:00 for 15s, then shows “waiting…” if late.</div>
-    <div id="status" class="meta"></div>
-  
+    <div id="status" class="meta"></div> <!-- debug line -->
   </header>
 
   <img id="snap" src="" alt="Latest snapshot">
 
   <script>
-    // ===== settings =====
-    const PUBLISH_INTERVAL_MS = 120000;   // 2 min (match your timer)
-    const IMAGE_REFRESH_MS    = 30000;    // reload <img>
-    const PIPELINE_OFFSET_MS  = 30000;    // ~30s GitHub Pages delay
-    const META_POLL_MS        = 7000;     // check meta.json for updates
+    // ===== settings (match these to your Beelink timer) =====
+    const PUBLISH_INTERVAL_MS = 120000;   // 2 minutes
+    const IMAGE_REFRESH_MS    = 30000;    // reload <img> to defeat cache
+    const PIPELINE_OFFSET_MS  = 13000;    // ~13s delay for publish→GitHub availability
+    const META_POLL_MS        = 7000;     // poll meta.json for new timestamps
 
-    // Point to the Data repo (raw URLs)
+    // Data repo raw URLs (change 'main' to 'master' if your data repo uses master)
     const SNAP_URL = 'https://raw.githubusercontent.com/SJ-COGV/COGV-Pickleball-Cam-Data/main/snapshot.jpg';
     const META_URL = 'https://raw.githubusercontent.com/SJ-COGV/COGV-Pickleball-Cam-Data/main/meta.json';
-    // =====================
+    // ========================================================
 
-    const snap    = document.getElementById('snap');
-    const countEl = document.getElementById('count');
+    const snap     = document.getElementById('snap');
+    const countEl  = document.getElementById('count');
+    const statusEl = document.getElementById('status');
 
+    // ---- state ----
     let lastPublished = Number(localStorage.getItem('lastPublishedMs') || 0);
     let nextTarget    = lastPublished
       ? (lastPublished + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS)
       : (Date.now() + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS);
     let stalled       = false;
-    let holdAtZeroUntil = null; // 15s hold at 00:00
+    let holdAtZeroUntil = null;  // for the 15s hold at 00:00
 
     function fmt(ms){
       const s = Math.max(0, Math.floor(ms/1000));
@@ -55,53 +56,93 @@
       const ss = String(s % 60).padStart(2,'0');
       return `${m}:${ss}`;
     }
-    function showWaiting(){ stalled = true; countEl.textContent = 'waiting…'; }
+
+    function renderStatus(ts){
+      if (!ts || Number.isNaN(ts)) {
+        statusEl.textContent = 'Last meta: (none yet)';
+      } else {
+        statusEl.textContent = 'Last meta: ' + new Date(ts).toLocaleString();
+      }
+    }
+
+    function showWaiting(){
+      stalled = true;
+      countEl.textContent = 'waiting…';
+    }
+
     function resumeFrom(ts){
       stalled = false;
       lastPublished = ts;
       localStorage.setItem('lastPublishedMs', String(ts));
       holdAtZeroUntil = null;
-      nextTarget = ts + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS;
-      snap.src = SNAP_URL + '?t=' + Date.now();
-      document.getElementById('status').textContent =
-    'Last meta: ' + new Date(ts).toLocaleString();
-    
-   }
+      nextTarget = ts + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS; // snap to real schedule
+      snap.src = SNAP_URL + '?t=' + Date.now();                    // show fresh image immediately
+      renderStatus(ts);                                            // update debug line
+    }
+
     async function loadMeta(){
       try{
         const res = await fetch(META_URL + '?t=' + Date.now(), { cache: 'no-store' });
         if(!res.ok) return false;
         const meta = await res.json();
         const ts = Date.parse(meta.lastPublished);
+
+        // Always render (so refresh doesn't blank the debug line)
+        if (Number.isFinite(ts)) renderStatus(ts);
+
+        // Only resume if a new publish arrived
         if(Number.isFinite(ts) && ts > lastPublished){
           resumeFrom(ts);
         }
         return true;
-      }catch{ return false; }
+      }catch(_e){ return false; }
     }
+
     function tick(){
       if(stalled) return;
+
       const rem = nextTarget - Date.now();
       if(rem > 0){
         countEl.textContent = fmt(rem);
         holdAtZeroUntil = null;
         return;
       }
-      // At/past zero: hold 15s at 00:00 before showing "waiting…"
-      if(holdAtZeroUntil === null){ holdAtZeroUntil = Date.now() + 15000; }
+
+      // At / past zero: hold 15s at 00:00 before showing "waiting…"
+      if(holdAtZeroUntil === null){
+        holdAtZeroUntil = Date.now() + 15000; // 15s hold
+      }
       countEl.textContent = '00:00';
+
+      // Check for a new publish while holding
       loadMeta();
-      if(Date.now() >= holdAtZeroUntil){ showWaiting(); }
+
+      // If we've held the full 15s without a new publish, go to "waiting…"
+      if(Date.now() >= holdAtZeroUntil){
+        showWaiting();
+      }
     }
+
+    // ------- init without flashing wrong time -------
     (async function init(){
+      // show last known status immediately (persists across refresh)
+      if (lastPublished) renderStatus(lastPublished); else renderStatus(null);
+
       countEl.textContent = lastPublished ? fmt(nextTarget - Date.now()) : 'syncing…';
+
+      // Try to sync once before starting intervals
       await loadMeta();
+
+      // Start periodic checks
       setInterval(loadMeta, META_POLL_MS);
-      setInterval(()=>{ if(!stalled){ snap.src = SNAP_URL + '?t=' + Date.now(); } }, IMAGE_REFRESH_MS);
+      setInterval(() => { if(!stalled){ snap.src = SNAP_URL + '?t=' + Date.now(); } }, IMAGE_REFRESH_MS);
       setInterval(tick, 1000);
+
+      // Render immediately
       snap.src = SNAP_URL + '?t=' + Date.now();
       tick();
     })();
   </script>
 </body>
 </html>
+
