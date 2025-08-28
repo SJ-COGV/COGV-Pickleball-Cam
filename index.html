@@ -21,6 +21,8 @@
       <div class="pill">Next refresh in: <span id="count">--:--</span></div>
     </div>
     <div class="meta">Image updates every ~2 minutes. Page holds at 00:00 for 15s, then shows “waiting…” if late.</div>
+    <div id="status" class="meta"></div>
+  
   </header>
 
   <img id="snap" src="" alt="Latest snapshot">
@@ -61,7 +63,10 @@
       holdAtZeroUntil = null;
       nextTarget = ts + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS;
       snap.src = SNAP_URL + '?t=' + Date.now();
-    }
+      document.getElementById('status').textContent =
+    'Last meta: ' + new Date(ts).toLocaleString();
+    
+   }
     async function loadMeta(){
       try{
         const res = await fetch(META_URL + '?t=' + Date.now(), { cache: 'no-store' });
