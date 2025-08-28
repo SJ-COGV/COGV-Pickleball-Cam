@@ -23,7 +23,7 @@
     <div class="meta">Image updates every ~2 minutes. Page holds at 00:00 for 15s, then shows “waiting…” if late.</div>
   </header>
 
-  <img id="snap" src="snapshot.jpg" alt="Latest snapshot">
+  <img id="snap" src="" alt="Latest snapshot">
 
   <script>
     // ===== settings =====
@@ -31,6 +31,10 @@
     const IMAGE_REFRESH_MS    = 30000;    // reload <img>
     const PIPELINE_OFFSET_MS  = 30000;    // ~30s GitHub Pages delay
     const META_POLL_MS        = 7000;     // check meta.json for updates
+
+    // Point to the Data repo (raw URLs)
+    const SNAP_URL = 'https://raw.githubusercontent.com/SJ-COGV/COGV-Pickleball-Cam-Data/main/snapshot.jpg';
+    const META_URL = 'https://raw.githubusercontent.com/SJ-COGV/COGV-Pickleball-Cam-Data/main/meta.json';
     // =====================
 
     const snap    = document.getElementById('snap');
@@ -56,11 +60,11 @@
       localStorage.setItem('lastPublishedMs', String(ts));
       holdAtZeroUntil = null;
       nextTarget = ts + PIPELINE_OFFSET_MS + PUBLISH_INTERVAL_MS;
-      snap.src = 'snapshot.jpg?t=' + Date.now();
+      snap.src = SNAP_URL + '?t=' + Date.now();
     }
     async function loadMeta(){
       try{
-        const res = await fetch('meta.json?t=' + Date.now(), { cache: 'no-store' });
+        const res = await fetch(META_URL + '?t=' + Date.now(), { cache: 'no-store' });
         if(!res.ok) return false;
         const meta = await res.json();
         const ts = Date.parse(meta.lastPublished);
@@ -88,9 +92,9 @@
       countEl.textContent = lastPublished ? fmt(nextTarget - Date.now()) : 'syncing…';
       await loadMeta();
       setInterval(loadMeta, META_POLL_MS);
-      setInterval(()=>{ if(!stalled){ snap.src = 'snapshot.jpg?t=' + Date.now(); } }, IMAGE_REFRESH_MS);
+      setInterval(()=>{ if(!stalled){ snap.src = SNAP_URL + '?t=' + Date.now(); } }, IMAGE_REFRESH_MS);
       setInterval(tick, 1000);
-      snap.src = 'snapshot.jpg?t=' + Date.now();
+      snap.src = SNAP_URL + '?t=' + Date.now();
       tick();
     })();
   </script>
